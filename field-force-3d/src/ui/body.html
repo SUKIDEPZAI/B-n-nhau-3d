@@ -1,0 +1,47 @@
+<canvas id="game"></canvas><canvas id="mk"></canvas>
+<div id="hud" class="off">
+  <div id="mini"><canvas id="mm" width="220" height="220"></canvas><i id="mmn">N</i></div>
+  <div id="score">
+    <div class="tm b"><b id="sb">0</b></div><div id="mid"><span id="timer">6:00</span><small id="goal"></small></div><div class="tm r"><b id="sr">0</b></div>
+    <div id="doms"><span id="dA">A</span><span id="dB">B</span><span id="dC">C</span></div>
+  </div>
+  <div id="feed"></div>
+  <div id="topr"><button id="bCam">TPP</button><button id="bPause">II</button></div>
+  <div id="cross"><i></i><i></i><i></i><i></i></div><div id="hitm"></div><div id="dmg"></div><div id="dirs"></div><div id="msg"></div><div id="respawn"></div>
+  <div id="vit"><div class="bar hp"><i id="hpf"></i><span id="hpt">100</span></div><div class="bar ar"><i id="arf"></i><span id="art">0</span></div></div>
+  <div id="wcard"><small id="wname">AK-12</small><div id="wammo"><b>30</b><span>/120</span></div><div id="wlist"></div></div>
+  <div id="skills">
+    <button class="sk" id="kEmote"><i>☺</i><span>EMOTE</span></button>
+    <button class="sk" id="kHolo"><i>◈</i><span>HOLOGRAM</span><em></em></button>
+    <button class="sk" id="kScan"><i>◎</i><span>ABILITY</span><em></em></button>
+    <button class="sk" id="kCmd"><i>⚑</i><span>COMMAND</span><em></em></button>
+  </div>
+  <div id="touch">
+    <div id="lookzone"></div>
+    <div id="joy"><div id="knob"></div></div>
+    <button class="rb" id="fire2"><i>✹</i></button>
+    <button class="rb" id="fire"><i>✹</i></button>
+    <button class="rb" id="ads"><i>◉</i></button>
+    <button class="rb" id="jump"><i>⇧</i></button>
+    <button class="rb" id="crouch"><i>⤓</i></button>
+    <button class="rb" id="reload"><i>↻</i></button>
+    <button class="rb" id="swap"><i>⇄</i></button>
+    <button class="rb" id="nade"><i>●</i><span>x<b id="nn">2</b></span></button>
+  </div>
+</div>
+<div id="menu" class="ov">
+  <div class="card">
+    <h1>FIELD FORCE <b>3D</b></h1><p class="sub">Village Operations — tác chiến làng Địa Trung Hải</p>
+    <div class="row" id="modes">
+      <button data-m="tdm" class="sel"><b>ĐỘI ĐỐI KHÁNG</b><small>5 vs 5 · tới 40 hạ gục</small></button>
+      <button data-m="dom"><b>CHIẾM ĐIỂM</b><small>3 điểm A·B·C · tới 200</small></button>
+      <button data-m="ffa"><b>SINH TỒN CÁ NHÂN</b><small>7 người · tới 15 hạ gục</small></button>
+    </div>
+    <div class="row sm"><label>Đồ hoạ <select id="qsel"><option value="auto">Tự động</option><option value="low">Thấp</option><option value="med">Vừa</option><option value="high">Cao</option></select></label></div>
+    <button id="play" class="go">VÀO TRẬN</button>
+    <div id="load"><i id="lbar"></i><span id="ltxt"></span></div>
+    <p class="keys"><b>PC:</b> WASD di chuyển · Chuột ngắm/bắn · Chuột phải ngắm · R nạp · Space nhảy · C ngồi · 1/2/3 đổi súng · G lựu đạn · V góc nhìn · Q quét · E hologram · T emote · X ra lệnh · Esc tạm dừng</p>
+  </div>
+</div>
+<div id="pause" class="ov hide"><div class="card"><h2>TẠM DỪNG</h2><button id="resume" class="go">TIẾP TỤC</button><button id="quit" class="ghost">Về menu</button></div></div>
+<div id="end" class="ov hide"><div class="card"><h2 id="etitle">KẾT THÚC</h2><div id="etable"></div><button id="again" class="go">CHƠI LẠI</button><button id="tomenu" class="ghost">Về menu</button></div></div>
