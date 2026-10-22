@@ -7,13 +7,14 @@ export class Sound {
       const C = window.AudioContext || window.webkitAudioContext;
       if (!C) return;
       this.ctx = new C();
-      this.master = this.ctx.createGain(); this.master.gain.value = 0.55; this.master.connect(this.ctx.destination);
+      this.master = this.ctx.createGain(); this.master.gain.value = this.on ? 0.55 : 0; this.master.connect(this.ctx.destination);
       const n = this.ctx.sampleRate;
       this.buf = this.ctx.createBuffer(1, n, n);
       const d = this.buf.getChannelData(0);
       for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     } catch { this.ctx = null; }
   }
+  setOn(v) { this.on = v; if (this.master) this.master.gain.value = v ? 0.55 : 0; }
   _out(gain, pan) {
     const c = this.ctx, g = c.createGain(); g.gain.value = gain;
     if (pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(this.master); } else g.connect(this.master);

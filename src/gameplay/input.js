@@ -1,7 +1,7 @@
 // Điều khiển: bàn phím + chuột (pointer lock) và cảm ứng (cần analog, vùng xoay, nút bắn kéo-để-xoay).
 export class Input {
   constructor() {
-    this.touch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+    this.touch = matchMedia('(pointer:coarse)').matches;
     this.mx = 0; this.mz = 0;       // mx phải +, mz tiến +
     this.lx = 0; this.ly = 0;       // tích luỹ xoay (radian)
     this.fire = false; this.adsHold = false; this.crouchT = false;
@@ -29,7 +29,7 @@ export class Input {
   _mouse() {
     const cv = document.getElementById('game');
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === cv; if (!this.locked && this.active) this.e.pause = 1; });
-    addEventListener('mousedown', (ev) => { if (this.touch || !this.active) return; if (!this.locked) { cv.requestPointerLock?.(); return; } if (ev.button === 0) this.fire = true; else if (ev.button === 2) this.adsHold = true; });
+    addEventListener('mousedown', (ev) => { if (this.touch || !this.active || ev.target.closest?.('button')) return; if (!this.locked) { cv.requestPointerLock?.(); return; } if (ev.button === 0) this.fire = true; else if (ev.button === 2) this.adsHold = true; });
     addEventListener('mouseup', (ev) => { if (ev.button === 0) this.fire = false; else if (ev.button === 2) this.adsHold = false; });
     addEventListener('mousemove', (ev) => { if (this.locked) { this.lx += ev.movementX * this.sens; this.ly += ev.movementY * this.sens; } });
     addEventListener('contextmenu', (ev) => ev.preventDefault());

@@ -27,6 +27,16 @@ selMode(mode);
 for (const b of document.querySelectorAll('#modes button')) b.addEventListener('click', () => selMode(b.dataset.m));
 $('qsel').value = store.get('ff_q', 'auto');
 $('qsel').addEventListener('change', () => store.set('ff_q', $('qsel').value));
+const baseSens = input.sens;
+$('sens').value = store.get('ff_sens', '1'); input.sens = baseSens * +$('sens').value;
+$('sens').addEventListener('input', () => { input.sens = baseSens * +$('sens').value; store.set('ff_sens', $('sens').value); });
+$('snd').checked = store.get('ff_snd', '1') === '1'; sound.on = $('snd').checked;
+$('snd').addEventListener('change', () => { sound.setOn($('snd').checked); store.set('ff_snd', $('snd').checked ? '1' : '0'); });
+function stats() { $('stM').textContent = store.get('ff_matches', '0'); $('stK').textContent = store.get('ff_kills', '0'); }
+stats();
+// nút kỹ năng (cảm ứng + chuột): kích hoạt ngay khi chạm
+for (const [id, k] of [['kEmote', 'emote'], ['kHolo', 'holo'], ['kScan', 'scan'], ['kCmd', 'cmd']]) $(id).addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); input.e[k] = 1; });
+for (const id of ['bCam', 'bPause']) $(id).addEventListener('pointerdown', (ev) => ev.stopPropagation());
 $('play').addEventListener('click', async () => {
   if (building) return;
   sound.unlock();
@@ -44,7 +54,7 @@ $('quit').addEventListener('click', () => toMenu());
 $('resume').addEventListener('click', () => resume());
 $('bPause').addEventListener('click', () => pause());
 $('bCam').addEventListener('click', () => { input.e.cam = 1; });
-function toMenu() { if (G) { G.running = false; } $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.add('off'); $('menu').classList.remove('hide'); $('load').style.display = 'none'; input.active = false; document.exitPointerLock?.(); }
+function toMenu() { stats(); if (G) { G.running = false; } $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.add('off'); $('menu').classList.remove('hide'); $('load').style.display = 'none'; input.active = false; document.exitPointerLock?.(); }
 function pause() { if (!G || !G.running) return; G.paused = true; $('pause').classList.remove('hide'); input.active = false; input.fire = false; document.exitPointerLock?.(); }
 function resume() { if (!G) return; G.paused = false; $('pause').classList.add('hide'); input.active = true; sound.unlock(); if (!input.touch) $('game').requestPointerLock?.(); }
 
@@ -361,6 +371,7 @@ function endMatch(win) {
   const rows = G.units.filter((u) => !u.decoy).sort((a, b) => b.kills - a.kills).map((u) => `<div class="${u.isPlayer ? 'me' : ''}"><span>${u.name}${G.mode !== 'ffa' ? ' · ' + (u.team === 'blue' ? 'Xanh' : 'Đỏ') : ''}</span><span>${u.kills} hạ · ${u.deaths} chết</span></div>`);
   $('etable').innerHTML = (G.mode !== 'ffa' ? `<div><b>Xanh ${G.score.blue}</b><b>Đỏ ${G.score.red}</b></div>` : '') + rows.join('');
   if (me) sound.win();
+  store.set('ff_matches', String(+store.get('ff_matches', '0') + 1)); store.set('ff_kills', String(+store.get('ff_kills', '0') + G.P.kills)); stats();
   setTimeout(() => { $('end').classList.remove('hide'); }, 900);
 }
 
