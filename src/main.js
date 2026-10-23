@@ -4,14 +4,17 @@ import { Engine } from './core/engine.js';
 import { createTextures } from './world/textures.js';
 import { createMaterials, buildVillage } from './world/village.js';
 import { Nav } from './core/phys.js';
-import { Soldier } from './models/soldier.js';
+import { Soldier, setFabric } from './models/soldier.js';
 import { BUILDERS } from './models/weapons.js';
+import { buildMedkit, buildArmorPlate, buildAmmoBox, buildGrenade } from './models/props.js';
 import { clamp, damp, fmtTime, wrapPi } from './core/util.js';
 import { Input } from './gameplay/input.js';
 import { Sound } from './gameplay/audio.js';
 import { FX } from './gameplay/fx.js';
 import { Bot } from './gameplay/bots.js';
 import { WEAPONS, rayUnit } from './gameplay/combat.js';
+import { initShop, loadout, itemName } from './shop.js';
+import { initAds, interstitialAd } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* bỏ qua */ } } };
@@ -58,6 +61,10 @@ function toMenu() { stats(); if (G) { G.running = false; } $('end').classList.ad
 function pause() { if (!G || !G.running) return; G.paused = true; $('pause').classList.remove('hide'); input.active = false; input.fire = false; document.exitPointerLock?.(); }
 function resume() { if (!G) return; G.paused = false; $('pause').classList.add('hide'); input.active = true; sound.unlock(); if (!input.touch) $('game').requestPointerLock?.(); }
 
+function refreshGear() { const l = loadout(); $('gP').textContent = itemName(l.primary); $('gS').textContent = itemName(l.skin); }
+initShop({ mute: (v) => sound.setOn(v ? false : $('snd').checked), onChange: refreshGear });
+initAds();
+
 // ---------- khởi tạo thế giới ----------
 async function boot(qName, prog) {
   const eng = new Engine($('game'), qName);
@@ -65,6 +72,7 @@ async function boot(qName, prog) {
   prog('Tạo vật liệu…', 0.05);
   const T = await createTextures({ res: tx, aniso: eng.q.aniso, progress: (f) => prog('Tạo vật liệu…', 0.05 + f * 0.5) });
   const M = createMaterials(T, eng.q.pbr);
+  setFabric(T.fabric && T.fabric.bump);
   prog('Dựng ngôi làng…', 0.6); await new Promise((r) => setTimeout(r, 16));
   const v = buildVillage(M);
   eng.scene.add(v.group);
@@ -87,11 +95,8 @@ function resizeMk() { if (!G) return; G.mk.width = innerWidth; G.mk.height = inn
 // ---------- người chơi ----------
 function buildPlayer() {
   const P = { isPlayer: true, team: 'blue', name: 'BẠN', x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: 0, kick: 0, kickY: 0, crouch: 0, crouchK: 0, speed: 0, hp: 100, armor: 0, alive: true, kills: 0, deaths: 0, invuln: 0, grounded: true, slot: 0, ads: 0, fireT: 0, reloadT: 0, emoteT: 0, nades: 2, camFP: false, respT: 0, spotted: 0, velX: 0, velZ: 0, firing: 0 };
-  P.guns = ['ak12', 'mp7', 'pistol'].map((id) => ({ W: WEAPONS[id], mag: WEAPONS[id].mag, res: WEAPONS[id].reserve, have: id !== 'mp7' }));
-  P.s = new Soldier('blue'); P.s.root.visible = false;
-  P.tpGuns = P.guns.map((g) => BUILDERS[g.W.id]());
-  P.vmGuns = P.guns.map((g) => { const o = BUILDERS[g.W.id](); o.visible = false; return o; });
-  const vm = new THREE.Group(); P.vm = vm; P.vmGuns.forEach((o, i) => { vm.add(o); });
+  P.s = new Soldier('blue'); P.s.root.visible = false; P.skinKey = 'blue';
+  const vm = new THREE.Group(); P.vm = vm; P.guns = []; P.tpGuns = []; P.vmGuns = [];
   // tay + tay áo trong viewmodel
   const gm = new THREE.MeshStandardMaterial({ color: 0x22231f, roughness: 0.9 }), sm = new THREE.MeshStandardMaterial({ color: 0x59634d, roughness: 0.9 });
   const limb = (m, ax, ay, az, bx, by, bz, r) => { const A = new THREE.Vector3(ax, ay, az), B = new THREE.Vector3(bx, by, bz), L = A.distanceTo(B); const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.12, L, 10), m); c.position.copy(A).add(B).multiplyScalar(0.5); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize()); vm.add(c); return c; };
@@ -101,7 +106,18 @@ function buildPlayer() {
   vm.scale.setScalar(0.82);
   G.eng.vmCamera.add(vm); G.eng.vmScene.add(G.eng.vmCamera);
   G.P = P; G.eng.scene.add(P.s.root);
-  P.s.setWeapon(P.tpGuns[0], false);
+}
+/** Áp trang bị đã chọn ở cửa hàng: súng chính, súng nhặt, súng phụ, trang phục. */
+function applyLoadout() {
+  const P = G.P, L = loadout();
+  const ids = [L.primary, L.primary === 'mp7' ? 'ak12' : 'mp7', 'pistol'];
+  for (const o of P.vmGuns) P.vm.remove(o);
+  P.guns = ids.map((id, i) => ({ W: WEAPONS[id], mag: WEAPONS[id].mag, res: WEAPONS[id].reserve, have: i !== 1 }));
+  P.tpGuns = ids.map((id) => BUILDERS[id]());
+  P.vmGuns = ids.map((id) => { const o = BUILDERS[id](); o.visible = false; P.vm.add(o); return o; });
+  const key = L.skin === 'std' ? 'blue' : 'blue_' + L.skin;
+  if (P.skinKey !== key) { G.eng.scene.remove(P.s.root); P.s = new Soldier(key); P.skinKey = key; G.eng.scene.add(P.s.root); }
+  P.slot = 0; P.vmGuns[0].visible = true; P.s.setWeapon(P.tpGuns[0], false); P.reloadT = 0;
 }
 function curGun(P = G.P) { return P.guns[P.slot]; }
 function selectSlot(i) {
@@ -116,9 +132,9 @@ function buildItems() {
   for (const it of G.info.items) {
     if (!['med', 'armor', 'ammo', 'mp7'].includes(it.type)) continue;
     const g = new THREE.Group();
-    if (it.type === 'med') { g.add(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.24), mat(0xeeeeee, 0.15))); const a = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.255), mat(0xd8352a, 0.4)), b = a.clone(); b.rotation.y = Math.PI / 2; b.scale.set(1, 1, 0.94); g.add(a, b); }
-    else if (it.type === 'armor') { g.add(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 0.14), mat(0x2d7bd6, 0.25))); const a = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.16), mat(0x14325c)); a.position.y = 0.1; g.add(a); }
-    else if (it.type === 'ammo') { g.add(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.2), mat(0xb08a2a, 0.25))); const a = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.22), mat(0x3a3a2a)); a.position.y = 0.06; g.add(a); }
+    if (it.type === 'med') g.add(buildMedkit());
+    else if (it.type === 'armor') { const a = buildArmorPlate(); a.rotation.y = 0; g.add(a); }
+    else if (it.type === 'ammo') g.add(buildAmmoBox());
     else { const w = BUILDERS.mp7(); w.scale.setScalar(1.6); g.add(w); }
     // vầng sáng
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.015, 6, 28), new THREE.MeshBasicMaterial({ color: it.type === 'med' ? 0x55ff88 : it.type === 'armor' ? 0x55aaff : 0xffcc44, transparent: true, opacity: 0.6, fog: false }));
@@ -202,11 +218,18 @@ function nearestEnemyYaw(u) {
 const _mz = new THREE.Vector3();
 /** Bắn 1 phát: tia từ (ox,oy,oz) hướng (dx,dy,dz); vệt đạn vẽ từ nòng (mx,my,mz). */
 function fireShot(by, mx, my, mz, ox, oy, oz, dx, dy, dz, W, mult) {
+  const n = W.pellets || 1;
+  for (let k = 0; k < n; k++) {
+    let ex = dx, ey = dy, ez = dz;
+    if (n > 1) { ex += (Math.random() - 0.5) * 2 * W.spread; ey += (Math.random() - 0.5) * 2 * W.spread; ez += (Math.random() - 0.5) * 2 * W.spread; const l = Math.hypot(ex, ey, ez); ex /= l; ey /= l; ez /= l; }
+    shootRay(by, mx, my, mz, ox, oy, oz, ex, ey, ez, W, mult, k === 0);
+  }
+}
+function shootRay(by, mx, my, mz, ox, oy, oz, dx, dy, dz, W, mult, first) {
   const w = G.world;
   let tmax = W.range;
   const hw = w.raycast(ox, oy, oz, dx, dy, dz, tmax, true);
   if (hw) tmax = hw.t;
-  // chỉ cho ra khỏi người bắn
   let hu = null, ht = tmax, zone = 'body';
   const us = G.units;
   for (let i = 0; i < us.length; i++) {
@@ -218,18 +241,20 @@ function fireShot(by, mx, my, mz, ox, oy, oz, dx, dy, dz, W, mult) {
   const t = hu ? ht : tmax;
   const hx = ox + dx * t, hy = oy + dy * t, hz = oz + dz * t;
   G.fx.tracer(mx, my, mz, hx, hy, hz, by.isPlayer ? 0 : 1);
-  G.fx.flash(mx, my, mz, by.isPlayer && !G.P.camFP ? 0.3 : 0.36);
-  const P = G.P, dxp = mx - P.x, dzp = mz - P.z, dp = Math.hypot(dxp, dzp);
-  if (by.isPlayer) sound.shot(W.snd, 1, 0); else { const rel = wrapPi(Math.atan2(-dxp, -dzp) - P.yaw); sound.shot(W.snd, Math.min(0.9, 14 / (dp + 6)), -Math.sin(rel)); }
+  if (first) {
+    G.fx.flash(mx, my, mz, by.isPlayer && !G.P.camFP ? 0.3 : 0.36);
+    const P = G.P, dxp = mx - P.x, dzp = mz - P.z, dp = Math.hypot(dxp, dzp);
+    if (by.isPlayer) sound.shot(W.snd, 1, 0); else { const rel = wrapPi(Math.atan2(-dxp, -dzp) - P.yaw); sound.shot(W.snd, Math.min(0.9, 14 / (dp + 6)), -Math.sin(rel)); }
+  }
   if (hu) {
     G.fx.blood(hx, hy, hz, -dx, 0.3, -dz);
     const mul = zone === 'head' ? 2.1 : zone === 'leg' ? 0.8 : 1;
-    const falloff = 1 - Math.min(0.35, t / W.range * 0.4);
+    const falloff = W.pellets ? Math.max(0.12, 1 - t / W.range) : 1 - Math.min(0.35, t / W.range * 0.4);
     damage(hu, W.dmg * mul * falloff * (mult || 1), by, zone, ox, oz);
-    if (by.isPlayer) { hitMarker(zone === 'head', !hu.alive); sound.hit(zone === 'head'); }
+    if (by.isPlayer) { hitMarker(zone === 'head', !hu.alive); if (first || !hu.alive) sound.hit(zone === 'head'); }
   } else if (hw) {
-    G.fx.spark(hx, hy, hz, hw.nx, hw.ny || 0.1, hw.nz, 4);
-  } else if (hy < 0.03 + 0.001 && dy < 0) G.fx.spark(hx, 0.03, hz, 0, 1, 0, 3);
+    G.fx.spark(hx, hy, hz, hw.nx, hw.ny || 0.1, hw.nz, W.pellets ? 2 : 4);
+  } else if (hy < 0.031 && dy < 0) G.fx.spark(hx, 0.03, hz, 0, 1, 0, 3);
 }
 function damage(u, amt, by, zone, fx, fz) {
   if (!u.alive || u.invuln > 0) return;
@@ -280,7 +305,7 @@ function respawn(u) {
 // ---------- lựu đạn, hologram ----------
 function throwNade() {
   const P = G.P; if (!P.alive || P.nades <= 0 || P.nadeT > 0) return;
-  const n = G.nades.find((q) => !q.on) || (G.nades.length < 8 ? (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshStandardMaterial({ color: 0x4a5a3a, roughness: 0.6 })); G.eng.scene.add(m); const q = { m, on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0, by: null }; G.nades.push(q); return q; })() : null);
+  const n = G.nades.find((q) => !q.on) || (G.nades.length < 8 ? (() => { const m = buildGrenade(); G.eng.scene.add(m); const q = { m, on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0, by: null }; G.nades.push(q); return q; })() : null);
   if (!n) return; P.nades--; P.nadeT = 0.8; $('nn').textContent = P.nades;
   const cp = Math.cos(P.pitch + 0.25), dirx = -Math.sin(P.yaw) * cp, dirz = -Math.cos(P.yaw) * cp, diry = Math.sin(P.pitch + 0.25);
   n.on = true; n.by = P; n.t = 1.8; n.m.visible = true;
@@ -338,7 +363,7 @@ function startMatch() {
   for (const n of G.nades) { n.on = false; n.m.visible = false; }
   if (holo) removeDecoy(holo);
   G.holoCd = 0; G.scanCd = 0; G.cmdCd = 0; G.scanT = 0; G.ping = null; G.pathQ.length = 0; G.units = []; G.bots = [];
-  const P = G.P; P.kills = 0; P.deaths = 0; P.team = 'blue'; G.units.push(P);
+  const P = G.P; applyLoadout(); P.kills = 0; P.deaths = 0; P.team = 'blue'; G.units.push(P);
   const mk = (team, pal, kind) => { const b = new Bot(G, team, pal, kind); eng.scene.add(b.s.root); G.units.push(b); G.bots.push(b); return b; };
   if (mode === 'ffa') { for (let i = 0; i < 7; i++) mk('f' + i, 'free', i % 3 ? 'ak12' : 'mp7'); G.score = {}; }
   else { for (let i = 0; i < 4; i++) mk('blue', 'blue', i % 3 ? 'ak12' : 'mp7'); for (let i = 0; i < 5; i++) mk('red', 'red', i % 3 ? 'ak12' : 'mp7'); }
@@ -349,7 +374,7 @@ function startMatch() {
   P.alive = false; respawn(P); P.alive = true; P.hp = 100;
   for (const b of G.bots) { G.units.splice(G.units.indexOf(b), 1); G.units.push(b); b.alive = false; respawn(b); }
   for (const it of G.items) { it.cd = 0; it.mesh.visible = true; }
-  P.slot = -1; P.guns[1].have = false; selectSlot(0); P.nades = 2; $('nn').textContent = 2;
+  P.nades = 2; $('nn').textContent = 2;
   P.vmGuns.forEach((o, k) => (o.visible = k === 0)); P.camFP = !input.touch ? false : false; $('bCam').textContent = 'TPP';
   $('menu').classList.add('hide'); $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.remove('off'); $('respawn').style.display = 'none';
   $('feed').innerHTML = ''; hudWeapons();
@@ -371,6 +396,7 @@ function endMatch(win) {
   const rows = G.units.filter((u) => !u.decoy).sort((a, b) => b.kills - a.kills).map((u) => `<div class="${u.isPlayer ? 'me' : ''}"><span>${u.name}${G.mode !== 'ffa' ? ' · ' + (u.team === 'blue' ? 'Xanh' : 'Đỏ') : ''}</span><span>${u.kills} hạ · ${u.deaths} chết</span></div>`);
   $('etable').innerHTML = (G.mode !== 'ffa' ? `<div><b>Xanh ${G.score.blue}</b><b>Đỏ ${G.score.red}</b></div>` : '') + rows.join('');
   if (me) sound.win();
+  setTimeout(() => interstitialAd('match-end', { before: () => sound.setOn(false), after: () => sound.setOn($('snd').checked) }), 2500);
   store.set('ff_matches', String(+store.get('ff_matches', '0') + 1)); store.set('ff_kills', String(+store.get('ff_kills', '0') + G.P.kills)); stats();
   setTimeout(() => { $('end').classList.remove('hide'); }, 900);
 }
@@ -396,7 +422,7 @@ function hudUpdate() {
   for (const [id, cd] of sk) { const b = $(id); const on = cd > 0; if (hc[id] !== on) { hc[id] = on; b.classList.toggle('cd', on); } if (on) { const e = b.querySelector('em'); const t = Math.ceil(cd); if (hc[id + 't'] !== t) { hc[id + 't'] = t; e.textContent = t + 's'; } } }
   const sp = (P.speed > 1 ? 5 : 0) + (P.grounded ? 0 : 9) + P.kick * 600 + (P.ads > 0.5 ? -4 : 0);
   const sq = Math.round(Math.max(0, sp) / 2) * 2; if (hc.sp !== sq) { hc.sp = sq; $('cross').style.setProperty('--sp', sq + 'px'); }
-  const co = P.ads > 0.6 && P.camFP ? 0.2 : 1; if (hc.co !== co) { hc.co = co; $('cross').style.opacity = co; }
+  const co = P.ads > 0.6 && g.W.scope ? 0 : P.ads > 0.6 && P.camFP ? 0.2 : 1; if (hc.co !== co) { hc.co = co; $('cross').style.opacity = co; }
   const rs = $('respawn'); if (!P.alive) { rs.style.display = 'block'; rs.textContent = 'Hồi sinh sau ' + Math.ceil(P.respT) + 's'; }
 }
 function drawOverlay() {
@@ -449,7 +475,7 @@ function update(dt) {
   // ---- người chơi ----
   const [lx, ly] = input.take();
   if (P.alive) {
-    const adsK = P.ads > 0.3 ? 0.6 : 1;
+    const adsK = P.ads > 0.3 ? (curGun().W.scope ? 0.28 : 0.6) : 1;
     P.yaw -= lx * adsK; P.pitch = clamp(P.pitch - ly * adsK, -1.35, 1.25);
     P.kickY *= 1; P.kick = damp(P.kick, 0, 7, dt);
     const gun = curGun();
@@ -540,7 +566,7 @@ function pickup(it) {
   if (it.type === 'med' && P.hp < 100) { P.hp = Math.min(100, P.hp + 50); ok = true; }
   else if (it.type === 'armor' && P.armor < 100) { P.armor = Math.min(100, P.armor + 50); ok = true; }
   else if (it.type === 'ammo') { for (const g of P.guns) g.res = Math.min(g.W.reserve * 2, g.res + g.W.mag * 2); P.nades = Math.min(3, P.nades + 1); $('nn').textContent = P.nades; ok = true; }
-  else if (it.type === 'mp7') { const g = P.guns[1]; if (!g.have) { g.have = true; g.mag = g.W.mag; g.res = g.W.reserve; hudWeapons(); showMsg('Nhặt được MP7 (phím 2)'); ok = true; } else if (g.res < g.W.reserve * 2) { g.res += g.W.mag; ok = true; } }
+  else if (it.type === 'mp7') { /* súng nhặt (ô 2) */ const g = P.guns[1]; if (!g.have) { g.have = true; g.mag = g.W.mag; g.res = g.W.reserve; hudWeapons(); showMsg('Nhặt được ' + g.W.name + ' (phím 2)'); ok = true; } else if (g.res < g.W.reserve * 2) { g.res += g.W.mag; ok = true; } }
   if (ok) { it.cd = 20; it.mesh.visible = false; sound.pick(); }
 }
 function playerShoot(g) {
@@ -568,12 +594,14 @@ const _cp = new THREE.Vector3();
 function render(dt) {
   const eng = G.eng, P = G.P, cam = eng.camera;
   const crouchY = 1.65 - P.crouchK * 0.45;
-  const fov0 = 66, fov = fov0 - P.ads * (P.camFP ? 22 : 16);
+  const gn = curGun(), scoped = !!(gn.W.scope && P.ads > 0.55 && P.alive);
+  const fov0 = 66, fov = gn.W.scope ? 66 - P.ads * 46 : fov0 - P.ads * (P.camFP ? 22 : 16);
   if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = fov; cam.updateProjectionMatrix(); }
   const pitch = P.pitch;
   const cp = Math.cos(pitch), fx = -Math.sin(P.yaw) * cp, fy = Math.sin(pitch), fz = -Math.cos(P.yaw) * cp;
   const rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-  const useFP = P.camFP && P.alive;
+  const useFP = (P.camFP || scoped) && P.alive;
+  if (hc.scope !== scoped) { hc.scope = scoped; $('scope').classList.toggle('hide', !scoped); }
   if (useFP) {
     cam.position.set(P.x, P.y + crouchY, P.z);
     cam.lookAt(P.x + fx, P.y + crouchY + fy, P.z + fz);
@@ -597,7 +625,7 @@ function render(dt) {
     s.update(dt, { speed: P.speed, crouch: !!P.crouch, pitch, firing: P.firing > 0.25, reloading: P.reloadT > 0, dead: !P.alive, emote: P.emoteT > 0 });
   } else s.update(dt * 0.0001, { speed: 0 });
   // viewmodel
-  eng.showVM = useFP;
+  eng.showVM = useFP && !scoped;
   if (useFP) {
     P.vmKick = damp(P.vmKick || 0, 0, 18, dt);
     const vm = P.vm, bob = Math.sin(G.now * 9) * 0.004 * Math.min(1, P.speed / 4) * (1 - P.ads);

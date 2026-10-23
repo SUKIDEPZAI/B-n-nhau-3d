@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { BUILDERS } from '../src/models/weapons.js';
+import { buildMedkit, buildArmorPlate, buildAmmoBox, buildGrenade } from '../src/models/props.js';
 import { Soldier } from '../src/models/soldier.js';
 import { Engine } from '../src/core/engine.js';
 import { createTextures } from '../src/world/textures.js';
@@ -22,8 +23,11 @@ const ui = document.getElementById('ui');
 ui.innerHTML = '<b>Model Lab</b> — kích thước thật (m)<br><select id=sel></select><br><button id=glb>Xuất GLB</button><button id=obj>Xuất OBJ</button><button id=spin>Xoay</button><pre id=info></pre><small>Kéo chuột để xoay, lăn để zoom. Lưới nhỏ = 10 cm.</small>';
 let spin = true; document.getElementById('spin').onclick = () => (spin = !spin);
 const models = {
-  'AK-12': () => BUILDERS.ak12(), 'MP7': () => BUILDERS.mp7(), 'Pistol G17': () => BUILDERS.pistol(),
+  'AK-12': () => BUILDERS.ak12(), 'MP7': () => BUILDERS.mp7(), 'Hộp y tế': buildMedkit, 'Tấm giáp': buildArmorPlate, 'Thùng đạn': buildAmmoBox, 'Lựu đạn': buildGrenade, 'Pistol G17': () => BUILDERS.pistol(), 'SG-12 Shotgun': () => BUILDERS.shotgun(), 'SR-7 Bắn tỉa': () => BUILDERS.sniper(),
   'Lính phe xanh': () => { const s = new Soldier('blue'); s.setWeapon(BUILDERS.ak12()); for (let i = 0; i < 30; i++) s.update(0.05, { speed: 0 }); return s.root; },
+  'Lính sa mạc': () => { const s = new Soldier('blue_desert'); s.setWeapon(BUILDERS.ak12()); for (let i = 0; i < 30; i++) s.update(0.05, { speed: 0 }); return s.root; },
+  'Lính rừng': () => { const s = new Soldier('blue_wood'); s.setWeapon(BUILDERS.ak12()); for (let i = 0; i < 30; i++) s.update(0.05, { speed: 0 }); return s.root; },
+  'Lính đêm': () => { const s = new Soldier('blue_night'); s.setWeapon(BUILDERS.sniper()); for (let i = 0; i < 30; i++) s.update(0.05, { speed: 0 }); return s.root; },
   'Lính phe đỏ': () => { const s = new Soldier('red'); s.setWeapon(BUILDERS.mp7()); for (let i = 0; i < 30; i++) s.update(0.05, { speed: 0 }); return s.root; },
 };
 const sel = document.getElementById('sel');
@@ -60,3 +64,4 @@ window.__exportAll = async (n) => { sel.value = n; show(n); spin = false; cur.ro
   const glb = await new Promise((ok, no) => new GLTFExporter().parse(cur, ok, no, { binary: true, onlyVisible: true }));
   return { glb: b64(glb), obj: new OBJExporter().parse(cur) }; };
 window.__names = Object.keys(models);
+window.__view = (px, py, pz, tx, ty, tz) => { cam.position.set(px, py, pz); ctl.target.set(tx, ty, tz); cam.lookAt(tx, ty, tz); ctl.update(); eng.render(); };

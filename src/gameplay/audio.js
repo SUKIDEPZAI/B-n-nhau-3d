@@ -40,6 +40,8 @@ export class Sound {
   shot(kind, vol = 1, pan = 0) {
     if (!this.ctx || vol < 0.03) return;
     if (kind === 'pistol') { this._burst(0.11, 5200, 500, 0.55 * vol, pan); this._tone(220, 70, 0.1, 0.35 * vol, 'sine', pan); }
+    else if (kind === 'shotgun') { this._burst(0.28, 5000, 200, 1.0 * vol, pan); this._tone(110, 30, 0.22, 0.8 * vol, 'sine', pan); }
+    else if (kind === 'sniper') { this._burst(0.4, 4200, 150, 1.0 * vol, pan, 1); this._tone(95, 28, 0.35, 0.85 * vol, 'sine', pan); }
     else if (kind === 'mp7') { this._burst(0.09, 7000, 700, 0.5 * vol, pan); this._tone(260, 80, 0.07, 0.25 * vol, 'sine', pan); }
     else { this._burst(0.16, 6000, 350, 0.75 * vol, pan); this._tone(150, 45, 0.14, 0.5 * vol, 'sine', pan); }
   }

@@ -238,7 +238,7 @@ export class GeoBuilder {
       bevelEnabled: !!o.bevel,
       bevelSize: o.bevel ?? 0,
       bevelThickness: o.bevel ?? 0,
-      bevelSegments: 1,
+      bevelSegments: o.bevSeg ?? 1,
       curveSegments: o.curveSegments ?? 6,
     });
     geo.translate(0, 0, -depth / 2); // đùn đối xứng quanh z = 0

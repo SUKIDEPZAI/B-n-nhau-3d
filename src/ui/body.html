@@ -41,7 +41,8 @@
       </section>
       <aside class="panel">
         <h3>TRANG BỊ</h3>
-        <ul class="gear"><li><b>AK-12</b><small>chính · 30 viên</small></li><li><b>G17</b><small>phụ · 17 viên</small></li><li><b>MP7</b><small>nhặt trong làng</small></li><li><b>2 lựu đạn</b><small>nổ sau 1,8 s</small></li></ul>
+        <ul class="gear"><li><b id="gP">AK-12</b><small>súng chính</small></li><li><b id="gS">Tiêu chuẩn</b><small>trang phục</small></li><li><b>G17</b><small>súng phụ</small></li><li><b>2 lựu đạn</b><small>nổ sau 1,8 s</small></li></ul>
+        <button id="openShop" class="shopbtn">🛒 CỬA HÀNG <em>xem quảng cáo nhận model</em></button>
         <h3>CÀI ĐẶT</h3>
         <label class="set">Đồ hoạ <select id="qsel"><option value="auto">Tự động</option><option value="low">Thấp</option><option value="med">Vừa</option><option value="high">Cao</option></select></label>
         <label class="set">Độ nhạy <input id="sens" type="range" min="0.5" max="2" step="0.05" value="1"></label>
@@ -59,3 +60,10 @@
 </div>
 <div id="pause" class="ov hide"><div class="card"><h2>TẠM DỪNG</h2><button id="resume" class="go">TIẾP TỤC</button><button id="quit" class="ghost">Về menu</button></div></div>
 <div id="end" class="ov hide"><div class="card"><h2 id="etitle">KẾT THÚC</h2><div id="etable"></div><button id="again" class="go">CHƠI LẠI</button><button id="tomenu" class="ghost">Về menu</button></div></div>
+<div id="shop" class="ov hide"><div class="shopwrap">
+  <div class="shophd"><h2>CỬA HÀNG</h2><div id="shopTabs"><button data-t="weapon" class="sel">VŨ KHÍ</button><button data-t="skin">TRANG PHỤC</button></div><button id="shopX" class="xbtn">✕</button></div>
+  <p id="shopMode" class="shopnote"></p>
+  <div id="shopList"></div><div id="shopToast"></div>
+</div></div>
+<div id="adsim" class="ov hide"><div class="card"><small class="simtag">QUẢNG CÁO MÔ PHỎNG · chưa cấu hình AdSense</small><h2>Quảng cáo nhận thưởng</h2><div id="adsimT" class="big">5</div><button id="adsimX" class="go" disabled>Đang xem…</button><button id="adsimS" class="ghost">Bỏ qua (không nhận thưởng)</button></div></div>
+<div id="scope" class="hide"></div>

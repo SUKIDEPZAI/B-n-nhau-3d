@@ -11,7 +11,7 @@ await p.goto('file://' + file);
 await p.waitForFunction('window.__ready', null, { timeout: 120000 });
 for (const n of await p.evaluate('window.__names')) {
   const r = await p.evaluate((n) => window.__exportAll(n), n);
-  const base = ({ 'Lính phe xanh': 'linh_xanh', 'Lính phe đỏ': 'linh_do', 'AK-12': 'AK12', 'MP7': 'MP7', 'Pistol G17': 'G17' })[n] || 'model';
+  const base = ({ 'Lính phe xanh': 'linh_xanh', 'Lính phe đỏ': 'linh_do', 'AK-12': 'AK12', 'MP7': 'MP7', 'Pistol G17': 'G17', 'SG-12 Shotgun': 'SG12_shotgun', 'SR-7 Bắn tỉa': 'SR7_sniper', 'Hộp y tế': 'medkit', 'Tấm giáp': 'armor_plate', 'Thùng đạn': 'ammo_box', 'Lựu đạn': 'grenade', 'Lính sa mạc': 'linh_sa_mac', 'Lính rừng': 'linh_rung', 'Lính đêm': 'linh_dem' })[n] || 'model';
   fs.writeFileSync(`${outDir}/${base}.glb`, Buffer.from(r.glb, 'base64'));
   fs.writeFileSync(`${outDir}/${base}.obj`, r.obj);
   console.log(n, (r.glb.length * 0.75 / 1024).toFixed(0) + ' KB glb');

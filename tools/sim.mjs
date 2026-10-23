@@ -5,7 +5,7 @@ const b = await chromium.launch({ headless: true, args: ['--use-angle=swiftshade
 const touch = !!process.env.TOUCH; const p = await b.newPage({ viewport: touch ? { width: 844, height: 390 } : { width: 1100, height: 620 }, hasTouch: touch, isMobile: touch });
 p.on('console', (m) => { const t = m.text(); if (!/PCFSoft/.test(t)) console.log('console:', t.slice(0, 300)); });
 p.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 600)));
-await p.addInitScript('window.__manual=true');
+await p.addInitScript('window.__manual=true'); if (process.env.INV) await p.addInitScript(`localStorage.setItem('ff_inv2', '${process.env.INV}')`);
 await p.goto('file://' + file);
 await p.evaluate(`window.__start('${mode}')`); await p.evaluate('window.__step(1)');
 const r = await p.evaluate(`(async()=>{
