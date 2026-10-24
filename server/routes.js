@@ -17,7 +17,7 @@ function readJson(req, limit = 4096) {
     req.on('error', reject);
   });
 }
-export function createHandler({ store, secret, allowedOrigins }) {
+export function createHandler({ store, secret, allowedOrigins, fallback }) {
   const origins = (allowedOrigins || '').split(',').map((s) => s.trim()).filter(Boolean);
   return async (req, res) => {
     const origin = req.headers.origin;
@@ -54,6 +54,7 @@ export function createHandler({ store, secret, allowedOrigins }) {
         }
         return send(405, { error: 'method_not_allowed' });
       }
+      if (fallback && (req.method === 'GET' || req.method === 'HEAD') && !url.pathname.startsWith('/api/')) return fallback(req, res, url);
       return send(404, { error: 'not_found' });
     } catch (e) { return send(e.status || 500, { error: e.status ? e.message : 'server_error' }); }
   };

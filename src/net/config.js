@@ -2,7 +2,8 @@
 // `serverUrl` is the base URL of the deployed game server (see server/index.js). Leave empty to keep online mode disabled.
 // It can also be supplied at runtime with ?server=https://your-server.example (handy for local tests).
 const qs = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
-const fromQuery = qs.get('server') || '';
+// Priority: ?server= > window.__FF_SERVER__ (injected by server/static.js when the game is served by the game server itself)
+const fromQuery = qs.get('server') || (typeof window !== 'undefined' && window.__FF_SERVER__) || '';
 
 export const NET = {
   appName: 'Dragon anrena',

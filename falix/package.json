@@ -1,0 +1,17 @@
+{
+  "name": "dragon-arena-server",
+  "version": "5.2.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "colyseus": "^0.15.0",
+    "@colyseus/ws-transport": "^0.15.0",
+    "pg": "^8.11.0"
+  }
+}

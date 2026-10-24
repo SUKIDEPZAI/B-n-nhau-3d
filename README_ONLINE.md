@@ -3,6 +3,8 @@
 > **Trạng thái trung thực:** phần mô phỏng server (`server/sim.js`), API hồ sơ (`server/routes.js`), JWT, và adapter client (`src/net/online.js`) đã được chạy thử bằng `node --test` (16 test pass, gồm loopback client↔server).
 > **Chưa chạy thử:** `server/rooms/ArenaRoom.js` + `server/index.js` (cần `npm install colyseus` — sandbox build không cài được), SDK `colyseus.js` tải từ CDN, kết nối thật từ trình duyệt, Render/PostgreSQL, và API `https://tool-online.onrender.com/api` của nền tảng. Hãy chạy các bước test bên dưới trước khi công bố.
 
+> **Chạy trên FalixNodes:** xem `README_FALIX.md` (gói sẵn bằng `npm run build:falix`).
+
 ## Kiến trúc
 ```
 Browser (GitHub Pages)                    Game server (Render / VPS)
