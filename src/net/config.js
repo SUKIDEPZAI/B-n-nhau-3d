@@ -13,7 +13,7 @@ export const NET = {
   publicAppKey: '',
   // Documented platform API base. NOT called by this adapter (its endpoints are unverified); kept for a future provider.
   platformApi: 'https://tool-online.onrender.com/api',
-  serverUrl: fromQuery.replace(/\/+$/, ''),
+  serverUrl: 'serverbannhau.falixsrv.me:50886',
   colyseusSdk: 'https://cdn.jsdelivr.net/npm/colyseus.js@0.15/dist/colyseus.js',
   room: 'arena',
   inputHz: 20,
