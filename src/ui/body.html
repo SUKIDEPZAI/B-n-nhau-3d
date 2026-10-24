@@ -1,0 +1,89 @@
+<canvas id="game"></canvas><canvas id="mk"></canvas>
+<div id="hud" class="off">
+  <div id="mini"><canvas id="mm" width="220" height="220"></canvas><i id="mmn">N</i></div>
+  <div id="score">
+    <div class="tm b"><b id="sb">0</b></div><div id="mid"><span id="timer">6:00</span><small id="goal"></small></div><div class="tm r"><b id="sr">0</b></div>
+    <div id="doms"><span id="dA">A</span><span id="dB">B</span><span id="dC">C</span></div>
+  </div>
+  <div id="feed"></div>
+  <div id="topr"><button id="bCam">TPP</button><button id="bPause">II</button></div>
+  <div id="cross"><i></i><i></i><i></i><i></i></div><div id="hitm"></div><div id="dmg"></div><div id="dirs"></div><div id="msg"></div><div id="respawn"></div>
+  <div id="vit"><div class="bar hp"><i id="hpf"></i><span id="hpt">100</span></div><div class="bar ar"><i id="arf"></i><span id="art">0</span></div></div>
+  <div id="wcard"><small id="wname">AK-12</small><div id="wammo"><b>30</b><span>/120</span></div><div id="wlist"></div></div>
+  <div id="skills">
+    <button class="sk" id="kEmote"><i>☺</i><span>EMOTE</span></button>
+    <button class="sk" id="kHolo"><i>◈</i><span>HOLOGRAM</span><em></em></button>
+    <button class="sk" id="kScan"><i>◎</i><span>ABILITY</span><em></em></button>
+    <button class="sk" id="kCmd"><i>⚑</i><span>COMMAND</span><em></em></button>
+  </div>
+  <div id="touch">
+    <div id="lookzone"></div>
+    <div id="joy"><div id="knob"></div></div>
+    <button class="rb" id="fire2"><i>✹</i></button>
+    <button class="rb" id="fire"><i>✹</i></button>
+    <button class="rb" id="ads"><i>◉</i></button>
+    <button class="rb" id="jump"><i>⇧</i></button>
+    <button class="rb" id="crouch"><i>⤓</i></button>
+    <button class="rb" id="reload"><i>↻</i></button>
+    <button class="rb" id="swap"><i>⇄</i></button>
+    <button class="rb" id="nade"><i>●</i><span>x<b id="nn">2</b></span></button>
+  </div>
+</div>
+<div id="menu" class="ov lobby">
+  <div class="bg"></div>
+  <div class="wrap">
+    <header><div class="logo">FIELD FORCE <b>3D</b></div><div class="tag">VILLAGE OPERATIONS · TÁC CHIẾN LÀNG ĐỊA TRUNG HẢI</div></header>
+    <main>
+      <section class="modes" id="modes">
+        <button data-m="tdm" class="mode sel"><i>⚔</i><span><b>ĐỘI ĐỐI KHÁNG</b><small>5 vs 5 · đội nào đạt 40 hạ gục trước thắng</small></span><em>~6 phút</em></button>
+        <button data-m="dom" class="mode"><i>⚑</i><span><b>CHIẾM ĐIỂM</b><small>Giữ 3 điểm A · B · C, đạt 200 điểm trước</small></span><em>~7 phút</em></button>
+        <button data-m="ffa" class="mode"><i>☠</i><span><b>SINH TỒN CÁ NHÂN</b><small>7 đối thủ · ai đạt 15 hạ gục trước thắng</small></span><em>~5 phút</em></button>
+        <div class="online" id="online">
+          <h3>CHƠI ONLINE <small>sinh tồn cá nhân · tối đa 8 người</small></h3>
+          <div class="orow"><input id="onName" maxlength="16" placeholder="Tên hiển thị" autocomplete="off"><label class="chk"><input id="onPriv" type="checkbox"> phòng riêng</label></div>
+          <div class="orow"><button id="onQuick" class="ghost">⚡ Chơi nhanh</button><button id="onCreate" class="ghost">＋ Tạo phòng</button></div>
+          <div class="orow"><input id="onCode" maxlength="8" placeholder="Mã phòng" autocomplete="off" style="text-transform:uppercase"><button id="onJoin" class="ghost">Vào phòng</button></div>
+          <p id="onStatus" class="onstat"></p>
+        </div>
+      </section>
+      <section class="hero-card" aria-label="Mô hình người chơi 3D">
+        <div class="hero-top"><span class="live-dot"></span><span>ĐẶC VỤ CỦA BẠN</span><small>3D CHARACTER VIEW</small></div>
+        <div id="lobbyPreview" class="lobby-preview">
+          <canvas id="lobby3d" aria-label="Kéo để xoay mô hình nhân vật"></canvas>
+          <div class="preview-vignette"></div>
+          <div class="preview-crosshair">＋</div>
+          <div class="preview-name"><span>OPERATIVE</span><b>PHI ĐỘI TIÊN PHONG</b><small>BLUE SQUAD · LV. 01</small></div>
+          <div class="preview-hint"><span>↔</span> KÉO ĐỂ XOAY NHÂN VẬT</div>
+          <div class="preview-controls"><button type="button" id="heroRotate" aria-label="Bật hoặc tắt tự xoay">⟳ TỰ XOAY</button><span>REAL-TIME 3D</span></div>
+        </div>
+        <div class="hero-foot"><span><i></i> SẴN SÀNG CHIẾN ĐẤU</span><b>TACTICAL / 01</b></div>
+      </section>
+      <aside class="panel">
+        <h3>TRANG BỊ</h3>
+        <ul class="gear"><li><b id="gP">AK-12</b><small>súng chính</small></li><li><b id="gS">Tiêu chuẩn</b><small>trang phục</small></li><li><b>G17</b><small>súng phụ</small></li><li><b>2 lựu đạn</b><small>nổ sau 1,8 s</small></li></ul>
+        <button id="openShop" class="shopbtn">🛒 CỬA HÀNG <em>xem quảng cáo nhận model</em></button>
+        <h3>CÀI ĐẶT</h3>
+        <label class="set">Đồ hoạ <select id="qsel"><option value="auto">Tự động</option><option value="low">Thấp</option><option value="med">Vừa</option><option value="high">Cao</option></select></label>
+        <label class="set">Độ nhạy <input id="sens" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+        <label class="set">Âm thanh <input id="snd" type="checkbox" checked></label>
+        <h3>THÀNH TÍCH</h3>
+        <div class="stats"><div><b id="stM">0</b><small>trận</small></div><div><b id="stK">0</b><small>hạ gục</small></div></div>
+      </aside>
+    </main>
+    <footer>
+      <button id="play" class="go">VÀO TRẬN</button>
+      <div id="load"><i id="lbar"></i><span id="ltxt"></span></div>
+      <p class="keys"><b>PC:</b> WASD · chuột · chuột phải ngắm · R nạp · Space nhảy · C ngồi · 1/2/3 đổi súng · G lựu đạn · V góc nhìn · Q quét · E hologram · T emote · X ra lệnh · Esc dừng</p>
+    </footer>
+  </div>
+</div>
+<div id="pause" class="ov hide"><div class="card"><h2>TẠM DỪNG</h2><button id="resume" class="go">TIẾP TỤC</button><button id="quit" class="ghost">Về menu</button></div></div>
+<div id="end" class="ov hide"><div class="card"><h2 id="etitle">KẾT THÚC</h2><div id="etable"></div><button id="again" class="go">CHƠI LẠI</button><button id="tomenu" class="ghost">Về menu</button></div></div>
+<div id="shop" class="ov hide"><div class="shopwrap">
+  <div class="shophd"><h2>CỬA HÀNG</h2><div id="shopTabs"><button data-t="weapon" class="sel">VŨ KHÍ</button><button data-t="skin">TRANG PHỤC</button></div><button id="shopX" class="xbtn">✕</button></div>
+  <p id="shopMode" class="shopnote"></p>
+  <div id="shopList"></div><div id="shopToast"></div>
+</div></div>
+<div id="adsim" class="ov hide"><div class="card"><small class="simtag">QUẢNG CÁO MÔ PHỎNG · chưa cấu hình AdSense</small><h2>Quảng cáo nhận thưởng</h2><div id="adsimT" class="big">5</div><button id="adsimX" class="go" disabled>Đang xem…</button><button id="adsimS" class="ghost">Bỏ qua (không nhận thưởng)</button></div></div>
+<div id="scope" class="hide"></div>
+<div id="netbar" class="netbar" style="display:none" role="status" aria-live="polite"></div>

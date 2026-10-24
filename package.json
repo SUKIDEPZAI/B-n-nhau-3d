@@ -1,0 +1,26 @@
+{
+  "name": "field-force-3d",
+  "version": "5.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "DEV=1 node build.mjs",
+    "models": "node tools/export-models.mjs $PWD/dist/model-lab.html $PWD/models",
+    "server": "node server/index.js",
+    "test:server": "node --test server/test/*.test.mjs",
+    "build:falix": "node tools/build-server.mjs"
+  },
+  "dependencies": {
+    "colyseus": "^0.15.0",
+    "@colyseus/ws-transport": "^0.15.0",
+    "pg": "^8.11.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
