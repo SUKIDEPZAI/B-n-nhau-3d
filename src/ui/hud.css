@@ -108,3 +108,11 @@ main{flex:1;display:grid;grid-template-columns:1.5fr 1fr;gap:clamp(10px,2.4vmin,
 #adsim .go:disabled{opacity:.5;cursor:default}
 #scope{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 31vmin,#000 31.4vmin)}#scope.hide{display:none}
 #scope::before,#scope::after{content:"";position:absolute;background:#000c}#scope::before{left:50%;top:calc(50% - 31vmin);width:1px;height:62vmin}#scope::after{top:50%;left:calc(50% - 31vmin);height:1px;width:62vmin}
+
+.online{margin-top:12px;padding:12px;border:1px solid #ffffff22;border-radius:10px;background:#0006;display:flex;flex-direction:column;gap:8px}
+.online h3{margin:0;font-size:14px}.online h3 small{opacity:.6;font-weight:400;margin-left:6px}
+.orow{display:flex;gap:8px;align-items:center}.orow input[type=text],.orow input:not([type]){flex:1;min-width:0;padding:9px 10px;border-radius:8px;border:1px solid #ffffff33;background:#0008;color:#fff;font:inherit}
+.orow button{flex:1;padding:9px 10px;cursor:pointer}.chk{font-size:12px;white-space:nowrap;opacity:.85}
+.onstat{margin:0;font-size:12px;min-height:16px;color:#ffcf6b}
+.netbar{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:60;padding:4px 14px;border-radius:14px;font:600 12px system-ui;background:#000a;color:#fff;pointer-events:none}
+.netbar.ok{color:#7dffa0}.netbar.warn{color:#ffd24a}.netbar.bad{color:#ff7468}

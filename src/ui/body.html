@@ -38,6 +38,13 @@
         <button data-m="tdm" class="mode sel"><i>⚔</i><span><b>ĐỘI ĐỐI KHÁNG</b><small>5 vs 5 · đội nào đạt 40 hạ gục trước thắng</small></span><em>~6 phút</em></button>
         <button data-m="dom" class="mode"><i>⚑</i><span><b>CHIẾM ĐIỂM</b><small>Giữ 3 điểm A · B · C, đạt 200 điểm trước</small></span><em>~7 phút</em></button>
         <button data-m="ffa" class="mode"><i>☠</i><span><b>SINH TỒN CÁ NHÂN</b><small>7 đối thủ · ai đạt 15 hạ gục trước thắng</small></span><em>~5 phút</em></button>
+        <div class="online" id="online">
+          <h3>CHƠI ONLINE <small>sinh tồn cá nhân · tối đa 8 người</small></h3>
+          <div class="orow"><input id="onName" maxlength="16" placeholder="Tên hiển thị" autocomplete="off"><label class="chk"><input id="onPriv" type="checkbox"> phòng riêng</label></div>
+          <div class="orow"><button id="onQuick" class="ghost">⚡ Chơi nhanh</button><button id="onCreate" class="ghost">＋ Tạo phòng</button></div>
+          <div class="orow"><input id="onCode" maxlength="8" placeholder="Mã phòng" autocomplete="off" style="text-transform:uppercase"><button id="onJoin" class="ghost">Vào phòng</button></div>
+          <p id="onStatus" class="onstat"></p>
+        </div>
       </section>
       <aside class="panel">
         <h3>TRANG BỊ</h3>
@@ -67,3 +74,4 @@
 </div></div>
 <div id="adsim" class="ov hide"><div class="card"><small class="simtag">QUẢNG CÁO MÔ PHỎNG · chưa cấu hình AdSense</small><h2>Quảng cáo nhận thưởng</h2><div id="adsimT" class="big">5</div><button id="adsimX" class="go" disabled>Đang xem…</button><button id="adsimS" class="ghost">Bỏ qua (không nhận thưởng)</button></div></div>
 <div id="scope" class="hide"></div>
+<div id="netbar" class="netbar" style="display:none" role="status" aria-live="polite"></div>

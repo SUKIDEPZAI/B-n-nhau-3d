@@ -4,6 +4,7 @@ import { Engine } from './core/engine.js';
 import { createTextures } from './world/textures.js';
 import { createMaterials, buildVillage } from './world/village.js';
 import { Nav } from './core/phys.js';
+import { stepMove } from './core/move.js';
 import { Soldier, setFabric } from './models/soldier.js';
 import { BUILDERS } from './models/weapons.js';
 import { buildMedkit, buildArmorPlate, buildAmmoBox, buildGrenade } from './models/props.js';
@@ -15,6 +16,10 @@ import { Bot } from './gameplay/bots.js';
 import { WEAPONS, rayUnit } from './gameplay/combat.js';
 import { initShop, loadout, itemName } from './shop.js';
 import { initAds, interstitialAd } from './ads.js';
+import { NET } from './net/config.js';
+import { platform } from './net/platform.js';
+import { Realtime } from './net/realtime.js';
+import { createOnline } from './net/online.js';
 
 const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* bỏ qua */ } } };
@@ -57,7 +62,7 @@ $('quit').addEventListener('click', () => toMenu());
 $('resume').addEventListener('click', () => resume());
 $('bPause').addEventListener('click', () => pause());
 $('bCam').addEventListener('click', () => { input.e.cam = 1; });
-function toMenu() { stats(); if (G) { G.running = false; } $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.add('off'); $('menu').classList.remove('hide'); $('load').style.display = 'none'; input.active = false; document.exitPointerLock?.(); }
+function toMenu() { leaveOnline(); stats(); if (G) { G.running = false; } $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.add('off'); $('menu').classList.remove('hide'); $('load').style.display = 'none'; input.active = false; document.exitPointerLock?.(); }
 function pause() { if (!G || !G.running) return; G.paused = true; $('pause').classList.remove('hide'); input.active = false; input.fire = false; document.exitPointerLock?.(); }
 function resume() { if (!G) return; G.paused = false; $('pause').classList.add('hide'); input.active = true; sound.unlock(); if (!input.touch) $('game').requestPointerLock?.(); }
 
@@ -110,9 +115,9 @@ function buildPlayer() {
 /** Áp trang bị đã chọn ở cửa hàng: súng chính, súng nhặt, súng phụ, trang phục. */
 function applyLoadout() {
   const P = G.P, L = loadout();
-  const ids = [L.primary, L.primary === 'mp7' ? 'ak12' : 'mp7', 'pistol'];
+  const prim = G.onlinePending || G.online ? (L.primary === 'mp7' ? 'mp7' : 'ak12') : L.primary; const ids = [prim, prim === 'mp7' ? 'ak12' : 'mp7', 'pistol'];
   for (const o of P.vmGuns) P.vm.remove(o);
-  P.guns = ids.map((id, i) => ({ W: WEAPONS[id], mag: WEAPONS[id].mag, res: WEAPONS[id].reserve, have: i !== 1 }));
+  P.guns = ids.map((id, i) => ({ W: WEAPONS[id], mag: WEAPONS[id].mag, res: WEAPONS[id].reserve, have: i !== 1 || !!(G.onlinePending || G.online) }));
   P.tpGuns = ids.map((id) => BUILDERS[id]());
   P.vmGuns = ids.map((id) => { const o = BUILDERS[id](); o.visible = false; P.vm.add(o); return o; });
   const key = L.skin === 'std' ? 'blue' : 'blue_' + L.skin;
@@ -122,6 +127,7 @@ function applyLoadout() {
 function curGun(P = G.P) { return P.guns[P.slot]; }
 function selectSlot(i) {
   const P = G.P; if (!P.guns[i] || !P.guns[i].have || i === P.slot) return;
+  if (G.online) G.online.setWeapon(P.guns[i].W.id);
   P.slot = i; P.reloadT = 0; P.fireT = 0.25; P.swapT = 0.25;
   P.vmGuns.forEach((o, k) => (o.visible = k === i)); P.s.setWeapon(P.tpGuns[i], i === 2); sound.click(); hudWeapons();
 }
@@ -250,8 +256,8 @@ function shootRay(by, mx, my, mz, ox, oy, oz, dx, dy, dz, W, mult, first) {
     G.fx.blood(hx, hy, hz, -dx, 0.3, -dz);
     const mul = zone === 'head' ? 2.1 : zone === 'leg' ? 0.8 : 1;
     const falloff = W.pellets ? Math.max(0.12, 1 - t / W.range) : 1 - Math.min(0.35, t / W.range * 0.4);
-    damage(hu, W.dmg * mul * falloff * (mult || 1), by, zone, ox, oz);
-    if (by.isPlayer) { hitMarker(zone === 'head', !hu.alive); if (first || !hu.alive) sound.hit(zone === 'head'); }
+    if (!G.online) damage(hu, W.dmg * mul * falloff * (mult || 1), by, zone, ox, oz);
+    if (by.isPlayer && !G.online) { hitMarker(zone === 'head', !hu.alive); if (first || !hu.alive) sound.hit(zone === 'head'); }
   } else if (hw) {
     G.fx.spark(hx, hy, hz, hw.nx, hw.ny || 0.1, hw.nz, W.pellets ? 2 : 4);
   } else if (hy < 0.031 && dy < 0) G.fx.spark(hx, 0.03, hz, 0, 1, 0, 3);
@@ -356,34 +362,36 @@ function removeDecoy(d) { d.alive = false; G.eng.scene.remove(d.s.root); const i
 
 // ---------- trận đấu ----------
 function startMatch() {
-  const eng = G.eng;
-  G.mode = mode; G.running = true; G.paused = false; G.over = false; G.now = 0;
-  const cfg = MODES[mode]; G.t = cfg.time; G.score = { blue: 0, red: 0 }; G.domAcc = 0;
+  const eng = G.eng; const L2 = loadout();
+  G.online = G.onlinePending || null; G.onlinePending = null; G.mode = G.online ? 'ffa' : mode; G.running = true; G.paused = false; G.over = false; G.now = 0;
+  const cfg = MODES[G.mode]; G.t = cfg.time; G.score = { blue: 0, red: 0 }; G.domAcc = 0;
   for (const u of G.units) if (u.s && !u.isPlayer) eng.scene.remove(u.s.root);
   for (const n of G.nades) { n.on = false; n.m.visible = false; }
   if (holo) removeDecoy(holo);
   G.holoCd = 0; G.scanCd = 0; G.cmdCd = 0; G.scanT = 0; G.ping = null; G.pathQ.length = 0; G.units = []; G.bots = [];
   const P = G.P; applyLoadout(); P.kills = 0; P.deaths = 0; P.team = 'blue'; G.units.push(P);
   const mk = (team, pal, kind) => { const b = new Bot(G, team, pal, kind); eng.scene.add(b.s.root); G.units.push(b); G.bots.push(b); return b; };
-  if (mode === 'ffa') { for (let i = 0; i < 7; i++) mk('f' + i, 'free', i % 3 ? 'ak12' : 'mp7'); G.score = {}; }
+  if (G.online) { G.score = {}; }
+  else if (mode === 'ffa') { for (let i = 0; i < 7; i++) mk('f' + i, 'free', i % 3 ? 'ak12' : 'mp7'); G.score = {}; }
   else { for (let i = 0; i < 4; i++) mk('blue', 'blue', i % 3 ? 'ak12' : 'mp7'); for (let i = 0; i < 5; i++) mk('red', 'red', i % 3 ? 'ak12' : 'mp7'); }
   for (const id in G.objOwner) { G.objOwner[id] = null; G.objProg[id] = 0; paintObj(id); }
-  for (const id in G.objMesh) for (const k of ['beam', 'disc', 'flag']) G.objMesh[id][k].visible = mode === 'dom';
-  $('doms').style.display = mode === 'dom' ? 'flex' : 'none';
-  $('goal').textContent = cfg.label + ' · ' + cfg.goalTxt;
+  for (const id in G.objMesh) for (const k of ['beam', 'disc', 'flag']) G.objMesh[id][k].visible = G.mode === 'dom';
+  $('doms').style.display = G.mode === 'dom' ? 'flex' : 'none';
+  $('goal').textContent = G.online ? 'ONLINE · phòng ' + G.online.code : cfg.label + ' · ' + cfg.goalTxt;
   P.alive = false; respawn(P); P.alive = true; P.hp = 100;
   for (const b of G.bots) { G.units.splice(G.units.indexOf(b), 1); G.units.push(b); b.alive = false; respawn(b); }
-  for (const it of G.items) { it.cd = 0; it.mesh.visible = true; }
+  for (const it of G.items) { it.cd = 0; it.mesh.visible = !G.online; }
   P.nades = 2; $('nn').textContent = 2;
   P.vmGuns.forEach((o, k) => (o.visible = k === 0)); P.camFP = !input.touch ? false : false; $('bCam').textContent = 'TPP';
   $('menu').classList.add('hide'); $('end').classList.add('hide'); $('pause').classList.add('hide'); $('hud').classList.remove('off'); $('respawn').style.display = 'none';
   $('feed').innerHTML = ''; hudWeapons();
   input.active = true; input.take(); P.fireT = 0.3;
   if (!input.touch) $('game').requestPointerLock?.();
-  showMsg(mode === 'dom' ? 'Chiếm các điểm A · B · C' : mode === 'ffa' ? 'Hạ gục nhiều nhất!' : 'Hạ gục đội đối phương!');
+  if (G.online && L2.primary === 'mp7') G.online.setWeapon('mp7');
+  showMsg(G.online ? 'Trận online — hạ gục nhiều nhất!' : mode === 'dom' ? 'Chiếm các điểm A · B · C' : mode === 'ffa' ? 'Hạ gục nhiều nhất!' : 'Hạ gục đội đối phương!');
 }
 function checkEnd() {
-  if (G.over) return;
+  if (G.over || G.online) return;
   const cfg = MODES[G.mode]; let win = null;
   if (G.mode === 'ffa') { const top = G.units.filter((u) => !u.decoy).sort((a, b) => b.kills - a.kills)[0]; if (top.kills >= cfg.goal || G.t <= 0) win = top; }
   else if (G.score.blue >= cfg.goal || G.score.red >= cfg.goal || G.t <= 0) win = G.score.blue === G.score.red ? 'draw' : G.score.blue > G.score.red ? 'blue' : 'red';
@@ -468,7 +476,7 @@ function update(dt) {
   input.poll();
   if (e.pause) { e.pause = 0; if (G.running) { pause(); return; } }
   G.now += dt;
-  if (G.running) { G.t -= dt; if (G.t <= 0) { G.t = 0; checkEnd(); } }
+  if (G.running && !G.online) { G.t -= dt; if (G.t <= 0) { G.t = 0; checkEnd(); } }
   // đếm ngược kỹ năng
   if (G.holoCd > 0) G.holoCd -= dt; if (G.scanCd > 0) G.scanCd -= dt; if (G.cmdCd > 0) G.cmdCd -= dt; if (P.nadeT > 0) P.nadeT -= dt;
   if (P.invuln > 0) P.invuln -= dt;
@@ -482,27 +490,17 @@ function update(dt) {
     const wantAds = input.ads && P.reloadT <= 0;
     P.ads = damp(P.ads, wantAds ? 1 : 0, 14, dt);
     P.crouch = input.crouchT ? 1 : 0; P.crouchK = damp(P.crouchK, P.crouch, 12, dt);
-    const sp = (P.crouch ? 2.3 : 4.6) * (P.ads > 0.5 ? 0.6 : 1) * (P.reloadT > 0 ? 0.85 : 1);
-    let mx = input.mx, mz = input.mz; const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
-    const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-    const tvx = (fx * mz + rx * mx) * sp, tvz = (fz * mz + rz * mx) * sp;
-    const ac = P.grounded ? 14 : 3;
-    P.velX = damp(P.velX, tvx, ac, dt); P.velZ = damp(P.velZ, tvz, ac, dt);
-    const px = P.x, pz = P.z;
-    G.world.move(P, P.velX * dt, P.velZ * dt, 0.34, P.crouch ? 1.3 : 1.75, 0.5);
-    P.speed = Math.hypot(P.x - px, P.z - pz) / dt;
-    if (e.jump) { e.jump = 0; if (P.grounded && !P.crouch) { P.vy = 5.0; P.grounded = false; } }
-    P.vy -= 16 * dt; P.y += P.vy * dt;
-    const gr = G.world.groundAt(P.x, P.z, 0.3, P.y, 0.5);
-    if (P.y <= gr + 0.001 || (P.grounded && P.vy <= 0 && P.y - gr < 0.22)) { P.y = gr; P.vy = 0; P.grounded = true; } else P.grounded = false;
+    stepMove(G.world, P, { mx: input.mx, mz: input.mz, jump: !!e.jump, ads: P.ads > 0.5, reloading: P.reloadT > 0 }, dt);
+    if (e.jump && G.online) G.online.jumped();
+    e.jump = 0;
     // vũ khí
     if (e.reload) { e.reload = 0; startReload(); }
     if (e.swap) { e.swap = 0; let i = P.slot; for (let k = 0; k < 3; k++) { i = (i + 1) % 3; if (P.guns[i].have) { selectSlot(i); break; } } }
     if (e.slot >= 0) { selectSlot(e.slot); e.slot = -1; } else if (e.slot <= -2) { const dr = e.slot === -3 ? 1 : -1; let i = P.slot; for (let k = 0; k < 3; k++) { i = (i + dr + 3) % 3; if (P.guns[i].have) { selectSlot(i); break; } } e.slot = -1; }
-    if (e.nade) { e.nade = 0; throwNade(); }
-    if (e.holo) { e.holo = 0; spawnHolo(); }
-    if (e.scan) { e.scan = 0; if (G.scanCd <= 0) { G.scanT = G.now + 6; G.scanCd = 20; sound.scan(); showMsg('QUÉT: kẻ địch bị lộ 6 giây'); } }
-    if (e.cmd) { e.cmd = 0; doPing(); }
+    if (e.nade) { e.nade = 0; if (!G.online) throwNade(); }
+    if (e.holo) { e.holo = 0; if (!G.online) spawnHolo(); }
+    if (e.scan) { e.scan = 0; if (G.scanCd <= 0 && !G.online) { G.scanT = G.now + 6; G.scanCd = 20; sound.scan(); showMsg('QUÉT: kẻ địch bị lộ 6 giây'); } }
+    if (e.cmd) { e.cmd = 0; if (!G.online) doPing(); }
     if (e.emote) { e.emote = 0; P.emoteT = 2.6; }
     if (e.cam) { e.cam = 0; P.camFP = !P.camFP; $('bCam').textContent = P.camFP ? 'FPP' : 'TPP'; }
     P.fireT -= dt; if (P.swapT > 0) P.swapT -= dt; P.firing = Math.max(0, P.firing - dt * 5);
@@ -512,16 +510,17 @@ function update(dt) {
     P.held = input.fire;
     if (!input.fire && gun.mag === 0 && gun.res > 0 && P.reloadT <= 0) startReload();
     // nhặt vật phẩm
-    for (const it of G.items) if (it.cd <= 0 && Math.abs(it.x - P.x) < 1.1 && Math.abs(it.z - P.z) < 1.1) pickup(it);
+    if (!G.online) for (const it of G.items) if (it.cd <= 0 && Math.abs(it.x - P.x) < 1.1 && Math.abs(it.z - P.z) < 1.1) pickup(it);
   } else {
     e.jump = e.reload = e.swap = e.nade = e.holo = e.scan = e.cmd = e.emote = e.cam = 0; e.slot = -1;
-    P.respT -= dt; if (P.respT <= 0) respawn(P);
+    P.respT -= dt; if (P.respT <= 0 && !G.online) respawn(P);
     P.ads = damp(P.ads, 0, 10, dt);
   }
   for (const it of G.items) { if (it.cd > 0) { it.cd -= dt; if (it.cd <= 0) it.mesh.visible = true; } else { it.mesh.rotation.y += dt * 1.8; it.mesh.position.y = 1.0 + Math.sin(G.now * 2 + it.x) * 0.06; } }
   // ---- bot ----
   if (G.pathQ.length) { const b = G.pathQ.shift(); if (b.alive && b.goal) { b.path = G.nav.path(b, b.goal); b.pi = 0; b.pathReq = false; } else b.pathReq = false; }
   for (const b of G.bots) b.update(dt);
+  if (G.online) G.online.update(dt, input);
   stepNades(dt);
   // hologram sống
   for (const u of G.units) if (u.decoy) { u.life -= dt; u.s.update(dt, { speed: 0 }); if (u.life <= 0) { removeDecoy(u); break; } }
@@ -558,7 +557,7 @@ function doPing() {
 function startReload() {
   const P = G.P, g = curGun();
   if (P.reloadT > 0 || g.mag >= g.W.mag || g.res <= 0) return;
-  P.reloadT = g.W.reload; sound.reload();
+  P.reloadT = g.W.reload; sound.reload(); if (G.online) G.online.reload();
 }
 function finishReload() { const g = curGun(), n = Math.min(g.W.mag - g.mag, g.res); g.mag += n; g.res -= n; }
 function pickup(it) {
@@ -575,6 +574,7 @@ function playerShoot(g) {
   g.mag--; P.fireT = 60 / W.rpm; P.firing = 1;
   const cam = G.eng.camera; cam.updateMatrixWorld();
   cam.getWorldDirection(_f);
+  if (G.online) G.online.sendFire(cam.position, _f);
   const mv = P.speed > 1 ? 1.8 : 1, cr = P.crouch ? 0.7 : 1, air = P.grounded ? 1 : 3, ad = 1 - P.ads * 0.6;
   const sp = W.spread * mv * cr * air * ad + P.kick * 0.25;
   const rx = (Math.random() - 0.5) * 2 * sp, ry = (Math.random() - 0.5) * 2 * sp;
@@ -643,6 +643,84 @@ function render(dt) {
   if ((G.fcount++ & 1) === 0) drawMinimap();
   drawOverlay(); hudUpdate();
 }
+
+
+// ---------- online (Colyseus) ----------
+const rt = new Realtime();
+let onlineBusy = false;
+const NET_TXT = { idle: '', loading: 'Đang tải thư viện mạng…', connecting: 'Đang kết nối máy chủ…', connected: '', reconnecting: 'Mất kết nối — đang kết nối lại…', disconnected: 'Đã ngắt kết nối', 'room-full': 'Phòng đã đầy', 'not-found': 'Không tìm thấy phòng', 'auth-failed': 'Xác thực thất bại', error: 'Lỗi máy chủ' };
+const unsubNet = rt.onState((st, detail) => {
+  const bar = $('netbar'), txt = (NET_TXT[st] || st) + (detail && st !== 'connecting' && st !== 'loading' && st !== 'reconnecting' ? ' — ' + detail : '');
+  const show = !!NET_TXT[st] || st === 'connected' && G && G.online;
+  bar.className = 'netbar' + (st === 'connected' ? ' ok' : st === 'reconnecting' || st === 'connecting' || st === 'loading' ? ' warn' : ' bad');
+  bar.textContent = st === 'connected' ? (G && G.online ? `Online · ${rt.rtt || '…'} ms` : '') : txt; bar.style.display = bar.textContent && show ? 'block' : 'none';
+  $('onStatus').textContent = txt;
+  if (G && G.online && st === 'connected') hc.rtt = 0;
+});
+setInterval(() => { if (G && G.online && rt.state === 'connected') { const b = $('netbar'); b.textContent = `Online · ${rt.rtt || '…'} ms · phòng ${G.online.code || ''}`; b.style.display = 'block'; } }, 1000);
+function feedLine(by, v, zone, mine) {
+  const el = document.createElement('div'); if (mine) el.className = 'me';
+  const tag = (u) => `<span style="color:${u.isPlayer ? '#ffb02e' : '#e0b341'}">${esc(u.name)}</span>`;
+  el.innerHTML = `${tag(by)} ✕ ${tag(v)}${zone === 'head' ? ' ◎' : ''}`;
+  const f = $('feed'); f.appendChild(el); while (f.children.length > 5) f.firstChild.remove(); setTimeout(() => el.remove(), 6000);
+}
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const onlineHooks = {
+  welcome() {}, msg: showMsg, hitMarker, feed: feedLine,
+  remoteShot(by, e) {
+    const [ox, oy, oz] = e.o, [ex, ey, ez] = e.e; G.fx.tracer(ox, oy, oz, ex, ey, ez, 1); G.fx.flash(ox, oy, oz, 0.36);
+    const P = G.P, dxp = ox - P.x, dzp = oz - P.z, dp = Math.hypot(dxp, dzp), rel = wrapPi(Math.atan2(-dxp, -dzp) - P.yaw);
+    sound.shot(WEAPONS[e.w] ? WEAPONS[e.w].snd : 'ak12', Math.min(0.9, 14 / (dp + 6)), -Math.sin(rel));
+    if (e.v === G.online.me) { sound.hurt(); const d = $('dmg'); d.classList.add('on'); clearTimeout(G.dmgT); G.dmgT = setTimeout(() => d.classList.remove('on'), 80); }
+    else if (!e.v && ey < 3) G.fx.spark(ex, ey, ez, 0, 1, 0, 3);
+  },
+  died(by) { G.P.s.root.visible = true; showMsg('Bạn đã bị hạ gục bởi ' + by.name); },
+  respawned() { const P = G.P; P.s.root.visible = false; P.s.dead = 0; P.s.mesh.rotation.x = 0; P.s.mesh.position.y = 0; P.reloadT = 0; $('respawn').style.display = 'none'; hudWeapons(); },
+  ended(board, me) {
+    G.over = true; input.fire = false; document.exitPointerLock?.();
+    const mine = board[0] && board[0].n === me;
+    $('etitle').textContent = mine ? 'CHIẾN THẮNG' : 'KẾT THÚC'; $('etitle').style.color = mine ? '#ffb02e' : '#ddd';
+    $('etable').innerHTML = board.map((r) => `<div class="${r.n === me ? 'me' : ''}"><span>${r.rank}. ${esc(r.name)}</span><span>${r.kills} hạ · ${r.deaths} chết</span></div>`).join('');
+    $('again').style.display = 'none'; setTimeout(() => $('end').classList.remove('hide'), 700); saveOnlineProfile();
+  },
+  newRound() { G.over = false; $('end').classList.add('hide'); showMsg('Vòng mới bắt đầu'); },
+};
+function saveOnlineProfile() {
+  if (!platform.enabled() || !platform.token()) return;
+  const L = loadout();
+  platform.saveProfile({ name: $('onName').value.trim().slice(0, 16), loadout: { primary: L.primary, skin: L.skin }, settings: { sens: +$('sens').value, sound: $('snd').checked ? 1 : 0, quality: $('qsel').value } }).catch((e) => console.warn('profile save failed', e.message));
+}
+async function startOnline(kind) {
+  if (onlineBusy || building) return;
+  if (!platform.enabled()) { $('onStatus').textContent = 'Chưa cấu hình máy chủ online (serverUrl). Xem README_ONLINE.md.'; return; }
+  onlineBusy = true; sound.unlock();
+  const name = $('onName').value.trim().slice(0, 16) || 'Player';
+  try {
+    $('onStatus').textContent = 'Đang đăng nhập…';
+    const { token, profile } = await platform.login(name);
+    if (profile && profile.settings && !hc.profileApplied) { hc.profileApplied = 1; if (profile.name && !$('onName').value) $('onName').value = profile.name; }
+    if (!G) { building = true; $('load').style.display = 'block'; const q = $('qsel').value === 'auto' ? (input.touch ? 'med' : 'high') : $('qsel').value; await boot(q, (t, f) => { $('ltxt').textContent = t; $('lbar').style.right = (100 - f * 100) + '%'; }); building = false; }
+    // handlers are registered BEFORE joining so the first 'welcome' message cannot be missed
+    const on = createOnline(G, rt, { ...onlineHooks, welcome(m) { on.code = m.code; G.onlinePending = on; startMatch(); $('goal').textContent = 'ONLINE · phòng ' + m.code; } });
+    G.onlinePending = null;
+    try { const room = await rt.connect({ token, mode: kind, code: $('onCode').value, name, isPrivate: $('onPriv').checked }); if (!room) { on.dispose(); return; } }
+    catch (e) { on.dispose(); throw e; }
+    store.set('ff_name', name);
+  } catch (e) {
+    building = false; if (G) G.onlinePending = null; console.error(e);
+    const m = String((e && e.message) || ''); $('onStatus').textContent = NET_TXT[rt.state] && rt.state !== 'idle' ? NET_TXT[rt.state] : /fetch|abort|network/i.test(m) ? 'Không kết nối được máy chủ (kiểm tra serverUrl / CORS / máy chủ đang ngủ?)' : 'Lỗi: ' + m;
+  } finally { onlineBusy = false; $('load').style.display = 'none'; }
+}
+function leaveOnline() {
+  if (G && G.online) { saveOnlineProfile(); G.online.dispose(); G.online = null; $('again').style.display = ''; G.over = false; }
+  rt.leave(); $('netbar').style.display = 'none';
+}
+$('onName').value = store.get('ff_name', '');
+$('onQuick').addEventListener('click', () => startOnline('quick'));
+$('onCreate').addEventListener('click', () => startOnline('create'));
+$('onJoin').addEventListener('click', () => { if (!$('onCode').value.trim()) { $('onStatus').textContent = 'Nhập mã phòng'; return; } startOnline('join'); });
+if (!platform.enabled()) $('onStatus').textContent = 'Online chưa bật: thiếu serverUrl (xem README_ONLINE.md).';
+addEventListener('pagehide', () => { try { rt.dispose(); unsubNet(); } catch { /* ignore */ } });
 
 // kiểm thử / gỡ lỗi
 window.__G = () => G;
